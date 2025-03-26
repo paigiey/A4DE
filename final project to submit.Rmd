@@ -1,0 +1,355 @@
+---
+title: "eagles 4th down"
+output: word_document
+date: "2025-02-24"
+---
+
+```{r}
+library(tidyverse)
+library(nflverse)
+library(conflicted)
+
+conflict_prefer("filter", "dplyr")
+conflict_prefer("select", "dplyr")
+conflict_prefer("mutate", "dplyr")
+
+pbp_2024 <- nflreadr::load_pbp()
+
+eaglesPlays <- pbp_2024 %>% filter(home_team == "PHI" | away_team == "PHI")
+
+fourth_down <- eaglesPlays %>%
+  filter(down == 4, posteam == 'PHI') %>% 
+  mutate(decision = case_when(
+    play_type %in% c("run", "pass") ~ "Go for it",
+    play_type == "punt" ~ "Punt",
+    play_type == "field_goal" ~ "Field Goal",
+    TRUE ~ "Other"
+  )) %>%
+  filter(decision != "Other") %>%
+  mutate(first_down = replace_na(first_down, 0)) %>%
+  group_by(posteam, qtr, decision) %>%
+  summarise(
+    yardline_100 = yardline_100,
+    wp = replace_na(wp, 0.5),
+    count = n(),
+    ydstogo = mean(ydstogo, na.rm = TRUE),
+    ydsgained = mean(yards_gained, na.rm = TRUE),
+    numFirstDowns = sum(first_down),
+    conversionRate = mean(first_down, na.rm = TRUE),
+    avg_epa = mean(epa, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+jalenqbtime <- nflreadr::load_pbp(2021:2024)
+jalenplays <- jalenqbtime %>%
+  filter(home_team == "PHI" | away_team == "PHI")
+
+jalen_fourth_down <- jalenplays %>% 
+  filter(down == 4, posteam == 'PHI') %>% 
+  mutate(decision = case_when(
+    play_type %in% c("run", "pass") ~ "Go for it",
+    play_type == "punt" ~ "Punt",
+    play_type == "field_goal" ~ "Field Goal",
+    TRUE ~ "Other"
+  )) %>%
+  filter(decision != "Other") %>%
+  mutate(first_down = replace_na(first_down, 0)) %>%
+  group_by(posteam, qtr, decision) %>%
+  summarise(
+    down = down,
+    play_type = play_type,
+    passer = passer,
+    rusher = rusher,
+    count = n(),
+    ydstogo = mean(ydstogo, na.rm = TRUE),
+    ydsgained = mean(yards_gained, na.rm = TRUE),
+    numFirstDowns = sum(first_down),
+    conversionRate = mean(first_down, na.rm = TRUE),
+    avg_epa = mean(epa, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+fourth_down_all <- pbp_2024 %>%
+  filter(down == 4) %>% 
+  mutate(decision = case_when(
+    play_type %in% c("run", "pass") ~ "Go for it",
+    play_type == "punt" ~ "Punt",
+    play_type == "field_goal" ~ "Field Goal",
+    TRUE ~ "Other"
+  )) %>%
+  filter(decision != "Other") %>%
+  mutate(first_down = replace_na(first_down, 0)) %>%
+  group_by(posteam, qtr, decision) %>%
+  summarise(
+    posteam = posteam,
+    yardline_100 = yardline_100,
+    wp = replace_na(wp, 0.5),
+    passer = passer,
+    rusher = rusher,
+    count = n(),
+    ydstogo = mean(ydstogo, na.rm = TRUE),
+    ydsgained = mean(yards_gained, na.rm = TRUE),
+    numFirstDowns = sum(first_down),
+    conversionRate = mean(first_down, na.rm = TRUE),
+    avg_epa = mean(epa, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+eagles_go_for_it <- fourth_down %>%
+  filter(decision == "Go for it") %>%
+  summarise(
+    team = "Eagles",
+    attempts = sum(count),
+    conversion_rate = mean(conversionRate, na.rm = TRUE)
+  )
+
+league_go_for_it <- fourth_down_all %>%
+  filter(decision == "Go for it") %>%
+  summarise(
+    team = "League Average",
+    attempts = sum(count),
+    conversion_rate = mean(conversionRate, na.rm = TRUE)
+  )
+
+comparison <- bind_rows(eagles_go_for_it, league_go_for_it)
+
+print(comparison)  # Shows Eagles' go-for-it rate vs. league
+
+expected_decisions <- fourth_down %>%
+  mutate(expected_go = case_when(
+    (wp < 0.85 & yardline_100 < 50 & ydstogo <= 4) ~ "Go for it",
+    wp > 0.95 & ydstogo > 5 ~ "Punt",
+    yardline_100 <= 35 & ydstogo <= 4 ~ "Field Goal",
+    TRUE ~ "Other"
+  ))
+expected_decisions_league <- fourth_down_all %>%
+  mutate(expected_go = case_when(
+    (wp < 0.85 & yardline_100 < 50 & ydstogo <= 5) ~ "Go for it",
+    wp > 0.95 & ydstogo > 5 ~ "Punt",
+    yardline_100 <= 35 & ydstogo <= 4 ~ "Field Goal",
+    TRUE ~ "Other"
+  ))
+
+league_expected_rate <- expected_decisions_league %>%
+  group_by(posteam) %>%
+  summarise(
+    expected_go_for_it = sum(expected_go == "Go for it"),
+    total_attempts = n(),
+    expected_go_for_it_rate = mean(expected_go == "Go for it", na.rm = TRUE))
+
+league_actual_rate <- expected_decisions_league %>%
+  group_by(posteam) %>%
+   summarise(
+    actual_go_for_it_attempts = sum(decision == "Go for it"),
+    total_attempts = n(),
+    actual_go_for_it_rate = mean(decision == "Go for it", na.rm = TRUE)
+  )
+
+eagles_expected_rate <- expected_decisions %>%
+  summarise(
+    expected_go_for_it = sum(expected_go == "Go for it"),
+    total_attempts = n(),
+    eagles_expected_go_for_it_rate = mean(expected_go == "Go for it", na.rm = TRUE)
+  )
+
+eagles_actual_rate <- fourth_down %>%
+  summarise(
+    actual_go_for_it_attempts = sum(decision == "Go for it"),
+    total_attempts = n(),
+    eagles_actual_go_for_it_rate = mean(decision == "Go for it", na.rm = TRUE)
+  )
+
+comparison1 <- bind_cols(eagles_actual_rate, eagles_expected_rate) %>%
+  select(eagles_actual_go_for_it_rate, eagles_expected_go_for_it_rate)
+
+print(comparison1)
+
+comparison_league <- league_actual_rate %>%
+  left_join(league_expected_rate, by = "posteam") %>%
+  select(posteam, actual_go_for_it_rate, expected_go_for_it_rate)
+
+comparison_league <- comparison_league %>%
+  summarise(posteam = posteam,
+            actual_go_for_it_rate = actual_go_for_it_rate,
+            expected_go_for_it_rate = expected_go_for_it_rate,
+            over_expected = actual_go_for_it_rate - expected_go_for_it_rate)
+
+print(comparison_league)
+
+comparison_league %>%
+  arrange(desc(actual_go_for_it_rate)) %>%
+  head()
+
+comparison_league %>%
+  arrange(desc(actual_go_for_it_rate)) %>%
+  tail()
+
+comparison_long <- comparison1 %>%
+  pivot_longer(cols = c(eagles_actual_go_for_it_rate, eagles_expected_go_for_it_rate), 
+               names_to = "Type", values_to = "Rate") %>%
+  mutate(Type = case_when( Type == "eagles_actual_go_for_it_rate" ~ "Actual Go-For-It Rate", Type == "eagles_expected_go_for_it_rate" ~ "Expected Go-For-It Rate", TRUE ~ Type
+  ))
+
+ggplot(comparison_long, aes(x = Type, y = Rate, fill = Type)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = c("Actual Go-For-It Rate" = "#4CBB17", "Expected Go-For-It Rate" = "#A5ACAF"))+
+  labs(title = "Eagles' 4th Down Aggressiveness: Actual vs. Expected",
+       x = "Decision Type",
+       y = "Go-For-It Rate") +
+  theme_minimal()
+
+defensive_rank <- fourth_down_all %>%
+  group_by(posteam) %>%
+  summarise(def_stop_rate = mean(1 - conversionRate, na.rm = TRUE), .groups = "drop") %>%
+  arrange(desc(def_stop_rate))
+
+fourth_down_all <- fourth_down_all %>%
+  left_join(defensive_rank, by = "posteam") %>%
+  mutate(
+    def_stop_percentile = percent_rank(def_stop_rate),
+    adj_epa = avg_epa * (1 + (1 - def_stop_percentile)),
+    A4DE = conversionRate * adj_epa) 
+
+eagles_hurts <- jalen_fourth_down %>%
+  left_join(defensive_rank, by = "posteam") %>%
+  mutate(def_stop_percentile = percent_rank(def_stop_rate),
+  adj_epa = avg_epa * (1 + (1 - def_stop_percentile)), 
+  A4DE = conversionRate * adj_epa)  
+
+eagles_A4DE <- fourth_down_all %>%
+  filter(posteam == "PHI") %>%
+  summarise(A4DE = mean(A4DE, na.rm = TRUE))
+
+jalen_A4DE <- eagles_hurts %>%
+  filter(posteam == "PHI", (passer == "J.Hurts" | rusher == "J.Hurts")) %>%
+  summarise(A4DE = mean(A4DE, na.rm = TRUE))
+
+eagles_no_hurts_A4DE <- eagles_hurts %>%
+  filter(posteam == "PHI", (passer != "J.Hurts" | rusher != "J.Hurts")) %>%
+  summarise(A4DE = mean(A4DE, na.rm = TRUE))
+
+comparison_A4DE <- bind_rows(
+  eagles_A4DE %>% mutate(player = "Eagles (All QBs)"),
+  jalen_A4DE %>% mutate(player = "Jalen Hurts"),
+  eagles_no_hurts_A4DE %>% mutate(player = "Eagles Without Hurts")
+)
+
+print(comparison_A4DE)
+
+team_A4DE <- fourth_down_all %>%
+  group_by(posteam) %>%
+  summarise(
+    avg_A4DE = mean(A4DE, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+team_outcomes <- pbp_2024 %>%
+  group_by(game_id, home_team, away_team) %>%
+  slice_tail(n = 1) %>%
+  ungroup() %>%
+  select(game_id, home_team, away_team, home_score, away_score) %>%
+  tidyr::pivot_longer(
+    cols = c(home_team, away_team),
+    names_to = "location", 
+    values_to = "posteam"
+  ) %>%
+  mutate(
+    points = ifelse(location == "home_team", home_score, away_score),
+    opponent_points = ifelse(location == "home_team", away_score, home_score),
+    win = as.integer(points > opponent_points)
+  ) %>%
+  group_by(posteam) %>%
+  summarise(
+    total_points = sum(points, na.rm = TRUE),
+    total_wins = sum(win, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+team_metrics <- team_A4DE %>%
+  left_join(team_outcomes, by = "posteam") %>%
+  filter(!is.na(total_points), !is.na(avg_A4DE))
+
+correlation_result <- cor.test(team_metrics$avg_A4DE, team_metrics$total_wins)
+print(correlation_result)
+
+lm_model <- lm(total_wins ~ avg_A4DE, data = team_metrics)
+summary(lm_model)
+
+correlation_result_points <- cor.test(team_metrics$avg_A4DE, team_metrics$total_points)
+print(correlation_result)
+
+lm_model <- lm(total_points ~ avg_A4DE, data = team_metrics)
+summary(lm_model)
+
+# Visualizing 4th Down Trends
+ggplot(fourth_down, aes(x = factor(qtr), y = count, fill = decision)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_manual(values = c("Go for it" = "#4CBB17", "Punt" = "#36454F", "Field Goal" = "#A5ACAF"))+
+  labs(title = "Eagles' 4th Down Decisions by Quarter (2024 Season)",
+       x = "Quarter",
+       y = "Count of 4th Down Plays",
+       fill = "Decision") +
+  theme_minimal()
+
+eagles_trends <- pbp_2024 %>%
+  filter(posteam == "PHI", down == 4, play_type %in% c("run", "pass")) %>%
+  group_by(week) %>%
+  summarise(A4DE = mean(epa, na.rm = TRUE), .groups = "drop")
+
+ggplot(eagles_trends, aes(x = week, y = A4DE)) +
+  geom_line(color = "#4CBB17", size = 1.5) +
+  geom_point(color = "#36454F", size = 3) +
+  labs(title = "Eagles' Adjusted 4th Down Efficiency Over Time in 2024",
+       x = "Week",
+       y = "A4DE (Higher is Better)") +
+  theme_minimal()
+
+ggplot(team_metrics, aes(x = avg_A4DE, y = total_points)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(
+    title = "Relationship Between A4DE and Total Points (2024)",
+    x = "Average A4DE",
+    y = "Total Points"
+  ) +
+  theme_minimal()
+
+ggplot(team_metrics, aes(x = avg_A4DE, y = total_wins)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(
+    title = "Relationship Between A4DE and Wins (2024)",
+    x = "Average A4DE",
+    y = "Total Wins"
+  ) +
+  theme_minimal()
+
+jalen_trends <- jalenqbtime %>%
+  filter(posteam == "PHI", down == 4, play_type %in% c("run", "pass")) %>%
+  mutate(year = year(game_date)) %>% 
+  group_by(year) %>%
+  summarise(A4DE = mean(epa, na.rm = TRUE), .groups = "drop")
+
+ggplot(jalen_trends, aes(x = year, y = A4DE)) +
+  geom_line(color = "#4CBB17", size = 1.5) +
+  geom_point(color = "#36454F", size = 3) +
+  labs(title = "Jalen Hurts' Adjusted 4th Down Efficiency Over Time",
+       x = "Year",
+       y = "A4DE (Higher is Better)") +
+  theme_minimal()
+
+stability_check <- jalenqbtime %>%
+  filter(posteam == "PHI", down == 4, play_type %in% c("run", "pass"),
+         (passer == "J.Hurts" | rusher == "J.Hurts")) %>%
+  mutate(year = year(game_date)) %>%
+  group_by(year) %>%
+  summarise(A4DE = mean(epa, na.rm = TRUE), .groups = "drop") %>%
+  mutate(A4DE_change = A4DE - dplyr::lag(A4DE))
+
+# Check variance over years
+stability_summary <- stability_check %>%
+  summarise(jalen_A4DE_sd = sd(A4DE, na.rm = TRUE),
+            jalen_A4DE_yearly_correlation = cor(A4DE, dplyr::lag(A4DE), use = "complete.obs"))
+
+print(stability_summary)
+```
