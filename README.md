@@ -4,7 +4,7 @@ This project analyzes how NFL teams perform on **fourth-down plays**, introducin
 
 ---
 
-## 📌 Project Highlights
+## Project Highlights
 
 - Developed a **new metric (A4DE)** that adjusts fourth-down EPA by defensive stop rates.
 - Used **R** and the [`nflverse`](https://www.nflverse.com/) ecosystem to scrape and analyze NFL play-by-play data (2021–2024).
@@ -14,7 +14,7 @@ This project analyzes how NFL teams perform on **fourth-down plays**, introducin
 
 ---
 
-## 🧰 Tools & Technologies
+## Tools & Technologies
 
 - **R + nflverse** (`nflreadr`, `nflfastR`, `dplyr`, `ggplot2`)
 - **Markdown / RMarkdown** for reproducible reporting
@@ -22,7 +22,7 @@ This project analyzes how NFL teams perform on **fourth-down plays**, introducin
 - **PDF Export** for final presentation
 
 ---
-## 🔢 Methodology
+## Methodology
 
 1. **Data Sourcing:** Pulled play-by-play data using `nflverse` from 2021–2024.
 2. **Filtering:** Focused exclusively on 4th-down plays and categorized outcomes as:
@@ -39,7 +39,7 @@ This project analyzes how NFL teams perform on **fourth-down plays**, introducin
 
 ---
 
-## 📈 Key Findings
+## Key Findings
 
 - The **Philadelphia Eagles** led the NFL in 4th-down efficiency with a 70.97% conversion rate in 2024, well above the league average of 57.11%.
 - **A4DE** correlated positively with both **total wins** and **total points**, suggesting it captures high-leverage execution well.
