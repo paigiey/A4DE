@@ -19,7 +19,6 @@ This project analyzes how NFL teams perform on **fourth-down plays**, introducin
 - **R + nflverse** (`nflreadr`, `nflfastR`, `dplyr`, `ggplot2`)
 - **Markdown / RMarkdown** for reproducible reporting
 - **Regression modeling** for impact analysis
-- **PDF Export** for final presentation
 
 ---
 ## Methodology
